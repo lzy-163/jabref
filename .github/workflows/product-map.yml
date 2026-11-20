@@ -14,19 +14,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 100
+          fetch-depth: 0
 
       - name: Get changed Java files
         id: changed-files
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} -- '*.java' | sed 's|^|\"|' | sed 's|$|\"|' | paste -sd "," -)
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BASE_SHA=$(git hash-object -t tree /dev/null)
+          fi
+          FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- '*.java' | sed 's|^|\"|' | sed 's|$|\"|' | paste -sd "," -)
           if [ -z "$FILES" ]; then FILES="\"dummy.java\""; fi
           echo "expected_files=(${FILES})" >> $GITHUB_ENV
 
       - name: ProductMap Map Generation
         uses: product-map/product-map-action@v1.0.15
-        # disabled because of https://github.com/product-map/product-map-action/issues/7
-        if: false()
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           expected_files: ${{ env.expected_files }}
